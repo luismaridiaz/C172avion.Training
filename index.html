@@ -35,7 +35,7 @@ body{
 /* ---------- PANEL DE INSTRUMENTOS ---------- */
 #gaugePanel{
   position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
-  display:grid; grid-template-columns:repeat(6,auto); gap:6px;
+  display:grid; grid-template-columns:repeat(7,auto); gap:6px;
   padding:7px 9px; border-radius:12px;
   background:linear-gradient(180deg,rgba(10,16,26,.80),rgba(6,10,16,.92));
   border:1px solid #23334d; box-shadow:0 8px 28px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
@@ -283,7 +283,7 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
   .gauge span{font-size:7px}
   .gauge{width:44px}
   .gauge canvas{width:44px;height:44px}
-  #gaugePanel{grid-template-columns:repeat(6,auto); gap:3px; padding:4px 5px}
+  #gaugePanel{grid-template-columns:repeat(7,auto); gap:3px; padding:4px 5px}
   #ctrlOverlay .yokeArea{height:66px}
   #ctrlOverlay .lever{height:100px}
   #lessonBox{max-height:calc(100% - 100px)}
@@ -354,6 +354,7 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
       <div class="gauge"><canvas id="gTC"  width="200" height="200"></canvas><span>G. VIRAJE</span></div>
       <div class="gauge"><canvas id="gHDG" width="200" height="200"></canvas><span>RUMBO</span></div>
       <div class="gauge"><canvas id="gVSI" width="200" height="200"></canvas><span>V/S fpm</span></div>
+      <div class="gauge"><canvas id="gRPM" width="200" height="200"></canvas><span>RPM</span></div>
     </div>
 
     <div id="mapBox">
@@ -1527,6 +1528,31 @@ function gaugeHDG(cv, psi){
 }
 
 /* --- Variómetro --- */
+function gaugeRPM(cv, rpm){
+  const { ctx, S, R } = clearG(cv);
+  ctx.save(); ctx.translate(R,R);
+  const r = R*0.93; face(ctx, r);
+  const MAX = 3000, A0 = -135*DEG, A1 = 135*DEG;
+  const ang = v => A0 + clamp(v/MAX,0,1)*(A1-A0);
+  const arc = (v0,v1,col)=>{ ctx.beginPath(); ctx.arc(0,0,r*0.84,ang(v0)-Math.PI/2,ang(v1)-Math.PI/2); ctx.lineWidth=r*0.07; ctx.strokeStyle=col; ctx.stroke(); };
+  arc(500,2100,'rgba(255,255,255,.35)'); arc(2100,2550,'#3ddc84'); arc(2550,2700,'#ffd54f'); arc(2700,3000,'#ff5c5c');
+  ctx.strokeStyle='#cfe3f5'; ctx.fillStyle='#dbe9f7'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let v=0; v<=MAX; v+=250){
+    const big = v%500===0, a = ang(v)-Math.PI/2, c=Math.cos(a), sn=Math.sin(a);
+    ctx.lineWidth = big ? r*0.024 : r*0.011;
+    ctx.beginPath(); ctx.moveTo(c*r*0.76, sn*r*0.76); ctx.lineTo(c*r*(big?0.62:0.68), sn*r*(big?0.62:0.68)); ctx.stroke();
+    if(big){ ctx.font = `bold ${r*0.15}px ui-monospace,monospace`; ctx.fillText(String(v/100), c*r*0.48, sn*r*0.48); }
+  }
+  ctx.fillStyle='#8fd0f0'; ctx.font=`bold ${r*0.13}px ui-monospace,monospace`;
+  ctx.fillText('x100', 0, r*0.28);
+  ctx.fillStyle='#dbe9f7'; ctx.font=`bold ${r*0.17}px ui-monospace,monospace`;
+  ctx.fillText(String(Math.round(rpm)), 0, r*0.58);
+  ctx.save(); ctx.rotate(ang(rpm));
+  ctx.beginPath(); ctx.moveTo(-r*0.05,r*0.12); ctx.lineTo(0,-r*0.80); ctx.lineTo(r*0.05,r*0.12); ctx.closePath();
+  ctx.fillStyle='#f5f7fa'; ctx.fill(); ctx.restore();
+  ctx.beginPath(); ctx.arc(0,0,r*0.07,0,Math.PI*2); ctx.fillStyle='#46586f'; ctx.fill();
+  ctx.restore();
+}
 function gaugeVSI(cv, fpm){
   const { ctx, S, R } = clearG(cv);
   ctx.save(); ctx.translate(R,R);
@@ -2266,6 +2292,7 @@ function loop(now){
     gaugeTC ($('gTC'),  st.p, clamp((st.r*st.u/9.81 - Math.tan(st.phi))*0.9, -1, 1));
     gaugeHDG($('gHDG'), st.psi);
     gaugeVSI($('gVSI'), st.vsFpm);
+    gaugeRPM($('gRPM'), st.rpm);
 
     $('telIas').textContent   = Math.round(st.iasKt);
     $('telAlt').textContent   = Math.round(st.altFt);
@@ -3120,6 +3147,7 @@ const Gyro = {
    SISTEMAS DEL MOTOR (interfaz)
    ========================================================================== */
 const MAGS = ['OFF','R','L','BOTH'];
+let starterT0 = 0;
 function sysUpdateUI(st){
   if(!$('sysBat')) return;
   const s = st.sys;
@@ -3130,7 +3158,18 @@ function sysUpdateUI(st){
   $('sysPrime').textContent = 'CEBAR ' + s.primer;
   $('sysHum').classList.toggle('on', s.humid);
   $('sysStart').classList.toggle('on', s.starter);
-  $('sysState').textContent = (s.engineOn ? 'MOTOR EN MARCHA' : 'MOTOR PARADO') + (s.ice > 0.15 ? ' · HIELO ' + Math.round(s.ice*100) + '%' : '');
+  if(s.starter && (s.engineOn || performance.now() - starterT0 > 10000)){ ac.sys.starter = false; }
+  let why = '';
+  if(!s.engineOn && s.starter){
+    const miss = [];
+    if(!s.battery) miss.push('batería');
+    if(s.mag !== 'BOTH') miss.push('magnetos en BOTH');
+    if(ac.controls.mixture <= 0.4) miss.push('mezcla rica');
+    if(ac.controls.throttle >= 0.5) miss.push('menos gas');
+    if(s.cold && s.primer < 2) miss.push('cebar 2+');
+    why = miss.length ? ' · falta: ' + miss.join(', ') : ' · girando…';
+  }
+  $('sysState').textContent = (s.engineOn ? 'MOTOR EN MARCHA' : 'MOTOR PARADO') + (s.ice > 0.15 ? ' · HIELO ' + Math.round(s.ice*100) + '%' : '') + why;
   $('sysState').style.color = s.engineOn ? '#3ddc84' : '#ff8a8a';
 }
 
@@ -3469,9 +3508,11 @@ function boot(){
   $('sysPrime').onclick= ()=>{ ac.sys.primer = ac.sys.primer >= 5 ? 0 : ac.sys.primer + 1; };
   $('sysHum').onclick  = ()=>{ ac.sys.humid = !ac.sys.humid; };
   const st0 = $('sysStart');
-  const startOn = v => e=>{ if(e) e.preventDefault(); ac.sys.starter = v; };
-  st0.addEventListener('pointerdown', startOn(true));
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=> st0.addEventListener(ev, startOn(false)));
+  st0.style.touchAction = 'manipulation';
+  st0.addEventListener('click', ()=>{
+    ac.sys.starter = !ac.sys.starter; starterT0 = performance.now();
+    sysUpdateUI(ac.state());
+  });
   $('slTurb').addEventListener('input', e=>{
     const v = +e.target.value; ac.turbLevel = v; Settings.d.turb = v; Settings.save();
     $('valTurb').textContent = ['nula','ligera','moderada'][v];
