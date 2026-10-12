@@ -2232,6 +2232,7 @@ function loop(now){
   /* --- física con paso fijo --- */
   if(paused){
     acc = 0;
+    lastState = ac.state();
   } else {
     acc += dt;
     let iter = 0;
@@ -2657,7 +2658,7 @@ const Lsn = {
     const c = this.cur;
     setWindUI(c.wind[0], c.wind[1]);
     if(typeof c.scene === 'string') setScene(c.scene); else setScene('custom', c.scene);
-    this.state = 'brief'; setPaused(true);
+    this.state = 'brief'; setPaused(!c.freeBrief);
     $('lsTitle').textContent = c.title;
     $('lsBrief').innerHTML = c.brief + '<ul class="lsSteps">' + c.steps.map(s=>'<li>'+s+'</li>').join('') + '</ul>';
     this.renderPreview();
@@ -3274,7 +3275,7 @@ function approachLesson(o){
     brief:'Toca en el <b>blanco</b> (marcas de punto de toma) con ±60 m, velocidad 65 ±3 kt y alineado ±6 m.',
     steps:['Senda estable con PAPI 2 blancas + 2 rojas','Controla la senda con potencia, la velocidad con el morro','Flare corto y suave para no pasarte'] });
   /* arranque y pruebas */
-  const start = { id:'arranque', title:'Arranque, pruebas y rodaje', scene:'cold', wind:[2,0], grace:0, allowStall:true, noSinkCoach:true,
+  const start = { id:'arranque', title:'Arranque, pruebas y rodaje', scene:'cold', freeBrief:true, wind:[2,0], grace:0, allowStall:true, noSinkCoach:true,
     brief:'Motor parado. Completa la lista, <b>arranca</b> (cebador 2–3, mezcla rica, magnetos BOTH, gas ~15 %), haz la <b>prueba de magnetos</b> a ~1800 rpm y la de <b>calefacción de carburador</b>. Termina al iniciar la carrera de despegue.',
     steps:['Abre la lista de comprobación (botón Listas)','Magnetos: R → BOTH → L → BOTH (caída ≤ 150 rpm)','Carburador: ON → OFF con rpm estable'],
     start:(L)=>{ L.d = { started:false, rpmBoth:0, dropL:null, dropR:null, magBack:false, carbOn:false, carbDone:false, cough0:0 }; },
