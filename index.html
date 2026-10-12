@@ -113,7 +113,7 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   will-change:transform;
 }
-#yokeVisual svg{width:150px; height:78px; filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+#yokeVisual svg{overflow:visible; width:150px; height:78px; filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
 
 /* Pedales */
 .pedalArea{
@@ -420,9 +420,10 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
             <svg viewBox="0 0 150 78">
               <rect x="65" y="38" width="20" height="30" rx="4" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
               <rect x="16" y="30" width="118" height="8" rx="4" fill="#243244" stroke="#4fc3f7" stroke-width="1.6"/>
-              <rect x="6"  y="6"  width="15" height="32" rx="5" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
-              <rect x="129" y="6"  width="15" height="32" rx="5" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
-              <circle cx="75" cy="52" r="4.5" fill="#4fc3f7" opacity=".9"/>
+              <rect x="6"  y="-1" width="15" height="42" rx="6" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
+              <rect x="129" y="-1" width="15" height="42" rx="6" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
+              <circle cx="75" cy="52" r="8.5" fill="#4fc3f7" opacity=".9"/>
+              <circle id="yokeKnob" cx="75" cy="52" r="17" fill="transparent"/>
             </svg>
           </div>
         </div>
@@ -1879,6 +1880,7 @@ let leverThrottle, leverMixture, leverFlap;
 let yokeActive = false;
 const yokeArea = $('yokeArea'), yokeVisual = $('yokeVisual');
 
+let yokeV = false;           // modo solo cabeceo (arrastrando el botón central)
 function setYoke(clientX, clientY){
   const r = yokeArea.getBoundingClientRect();
   const dx = clientX - (r.left + r.width/2);
@@ -1886,21 +1888,23 @@ function setYoke(clientX, clientY){
 
   const elev = clamp(-dy/(r.height*0.42), -1, 1);
   const rollDeg = clamp(Math.atan2(dx, r.height*0.55)*RAD*0.85, -50, 50);
-  const ail = rollDeg/50;
+  const ail = yokeV ? 0 : rollDeg/50;
+  const rollShown = yokeV ? 0 : rollDeg;
 
   feel.cmd.elevator = elev;
   feel.cmd.aileron  = ail;
 
   yokeVisual.style.transform =
-    `translate(${(ail*r.width*0.16).toFixed(1)}px, ${(elev*r.height*0.16).toFixed(1)}px) rotate(${rollDeg.toFixed(1)}deg)`;
+    `translate(${(ail*r.width*0.16).toFixed(1)}px, ${(elev*r.height*0.16).toFixed(1)}px) rotate(${rollShown.toFixed(1)}deg)`;
 }
 yokeArea.addEventListener('pointerdown', e=>{
-  yokeActive = true; yokeArea.setPointerCapture(e.pointerId); setYoke(e.clientX, e.clientY);
+  yokeActive = true; yokeV = (e.target && e.target.id === 'yokeKnob');
+  yokeArea.setPointerCapture(e.pointerId); setYoke(e.clientX, e.clientY);
 });
 yokeArea.addEventListener('pointermove', e=>{ if(yokeActive) setYoke(e.clientX, e.clientY); });
 function releaseYoke(){
   if(!yokeActive) return;
-  yokeActive = false;
+  yokeActive = false; yokeV = false;
   yokeVisual.style.transition = 'transform .35s cubic-bezier(.2,.8,.3,1)';
   yokeVisual.style.transform = '';
   setTimeout(()=>{ yokeVisual.style.transition = ''; }, 380);
