@@ -810,7 +810,7 @@ class Aircraft {
     const as = P.alphaStall, aa = Math.abs(al);
     const stallAmt = aa > as ? Math.min(1,(aa-as)/(9*DEG)) : 0;
     this.stalled   = stallAmt > 0.08;
-    this.stallWarn = !contact && V > 8 && aa > as - 3.2*DEG;
+    this.stallWarn = !contact && V > 8 && aa > as - (P.warnMargin || 3.2*DEG);
     this.buffet    = contact ? 0 : clamp((aa-(as-2.5*DEG))/(2.5*DEG), 0, 1);
 
     /* --- motor / hélice --- */
@@ -2440,21 +2440,21 @@ function glideAngle(st){
 
 /* criterios reutilizables */
 const cAlt = (tol=100, need=.8)=>({ id:'alt', label:'Altitud', tol:'±'+tol+' ft', need,
-  gate:()=>true, ok:(st,L)=>Math.abs(st.altFt-L.tgt.alt)<=tol, val:(st,L)=>fmt(st.altFt-L.tgt.alt)+' ft',
+  gate:()=>true, ok:(st,L)=>Math.abs(st.altFt-L.tgt.alt)<=tol*TOL.s, val:(st,L)=>fmt(st.altFt-L.tgt.alt)+' ft',
   tip:'Altitud: si el V/S se va de cero, corrige el morro 1–2° y espera a que responda; no persigas la aguja.' });
 const cHdg = (tol=10, need=.8, target)=>({ id:'hdg', label:'Rumbo', tol:'±'+tol+'°', need,
-  gate:()=>true, ok:(st,L)=>Math.abs(dHdg(hdgOf(st), target!=null?target:L.tgt.hdg))<=tol,
+  gate:()=>true, ok:(st,L)=>Math.abs(dHdg(hdgOf(st), target!=null?target:L.tgt.hdg))<=tol*TOL.s,
   val:(st,L)=>fmt(dHdg(hdgOf(st), target!=null?target:L.tgt.hdg))+'°',
   tip:'Rumbo: alas a nivel con alerones suaves; elige un punto en el horizonte y comprueba el giróscopo.' });
 const cIas = (target, tol=10, need=.8, gate)=>({ id:'ias', label:'Velocidad', tol:target+' ±'+tol+' kt', need,
-  gate:gate||(()=>true), ok:st=>Math.abs(st.iasKt-target)<=tol, val:st=>fmt(st.iasKt)+' kt',
+  gate:gate||(()=>true), ok:st=>Math.abs(st.iasKt-target)<=tol*TOL.s, val:st=>fmt(st.iasKt)+' kt',
   tip:'Velocidad: el morro la controla (morro abajo = más); la potencia ajusta la altitud/régimen. Compensa con trim.' });
 
 /* eventos de toma compartidos entre lecciones */
 function tdEvents(st, L, zmin, zmax){
   if(!st.td || L.d.td) return;
   const t = st.td; L.d.td = true; L.d.t0 = st.time;
-  L.set('vs', t.vs >= -250, fmt(-t.vs)+' fpm');
+  L.set('vs', t.vs >= -TOL.tdFpm, fmt(-t.vs)+' fpm');
   L.set('zone', t.x >= zmin && t.x <= zmax, 'a '+fmt(t.x+RWY_HALF)+' m del umbral');
   L.set('att', t.theta >= 0.5 && Math.abs(t.phi) <= 6, 'cabeceo '+fmt(t.theta,1)+'° · banco '+fmt(t.phi,1)+'°');
 }
@@ -2562,7 +2562,7 @@ const LESSONS = [
   done:(st,L)=>st.altFt>=500 || L.te>=240 || (st.onGround && L.d.fl && st.time-L.d.t0>3) },
 
 { id:'aprox', title:'7 · Aproximación estabilizada', scene:'approach', wind:[2,0], grace:5,
-  brief:'Final de 3°, <b>65 kt</b>, flaps 20°. Usa el <b>PAPI</b> (2 blancas + 2 rojas) y toca entre <b>umbral+75 m y 625 m</b>.',
+  brief:'Final de 3°, <b>65 kt</b>, flaps 20°. Usa el <b>PAPI</b> (2 blancas + 2 rojas) y toca entre <b>umbral+75 m y 675 m</b>.',
   steps:['Velocidad: morro; senda: potencia','PAPI: blanco = alto (reduce), rojo = bajo (añade)','Flare a ~10 ft: ralentí y tira suave'],
   start:(L)=>{ L.d = { td:false, t0:0 }; },
   tick:(st,L)=>{
@@ -2580,7 +2580,7 @@ const LESSONS = [
     { id:'cl2', label:'Alineación con la pista', tol:'±10 m', need:.8, gate:st=>!st.onGround&&st.altFt>40,
       ok:st=>Math.abs(st.z)<=10, val:st=>fmt(st.z)+' m',
       tip:'Alineación: corrige el viento cruzado con ángulo de deriva (cangrejo) y pedal para alinear antes de tocar.' },
-    evVs, evZone('umbral+75 … 625 m'), evAtt, evBnc ],
+    evVs, evZone('umbral+75 … 675 m'), evAtt, evBnc ],
   done:(st,L)=>(L.d.td && st.time-L.d.t0>3) || L.te>=300 },
 
 { id:'toma', title:'8 · Toma y rodadura', scene:'flare', wind:[2,0], grace:0,
@@ -3309,12 +3309,12 @@ function approachLesson(o){
         tip:'Si suena la bocina, relaja un poco la tracción y añade gas: el avión debe seguir volando.' } ],
     done:(st,L)=>L.te>=90 };
   /* toma con viento cruzado */
-  const xw = approachLesson({ id:'cruzado', title:'Toma con viento cruzado', wind:[6,0], zmin:-550, zmax:50, zoneTxt:'umbral+75 … 625 m',
+  const xw = approachLesson({ id:'cruzado', title:'Toma con viento cruzado', wind:[6,0], zmin:-550, zmax:50, zoneTxt:'umbral+75 … 675 m',
     lat:8, align:{ z:6, h:8 },
     brief:'Mismo ejercicio con <b>viento cruzado de 12 kt</b>. Cangrejo en final; antes de tocar, <b>pedal</b> para alinear el morro y alerón contra el viento.',
     steps:['Final en cangrejo (morro hacia el viento)','Flare: pedal para alinear con la pista','Alerón contra el viento al tocar'] });
   /* toma de precisión */
-  const pre = approachLesson({ id:'precision', title:'Toma de precisión (blanco)', wind:[2,0], zmin:-360, zmax:-240, zoneTxt:'±60 m del blanco', ias:65, iasTol:3, lat:6,
+  const pre = approachLesson({ id:'precision', title:'Toma de precisión (blanco)', wind:[2,0], zmin:-460, zmax:-340, zoneTxt:'±60 m del blanco', ias:65, iasTol:3, lat:6,
     brief:'Toca en el <b>blanco</b> (marcas de punto de toma) con ±60 m, velocidad 65 ±3 kt y alineado ±6 m.',
     steps:['Senda estable con PAPI 2 blancas + 2 rojas','Controla la senda con potencia, la velocidad con el morro','Flare corto y suave para no pasarte'] });
   /* arranque y pruebas */
@@ -3398,7 +3398,7 @@ function approachLesson(o){
         tip:'Alinea con el eje desde la base: gira a final con tiempo y corrige deriva.' },
       { id:'seq', ev:true, label:'Secuencia del circuito', tol:'cruzado → viento en cola → base → final',
         tip:'Respeta la secuencia del circuito; gira a la izquierda en cada tramo.' },
-      evVs, evZone('umbral+75 … 625 m'), evAtt, evBnc,
+      evVs, evZone('umbral+75 … 675 m'), evAtt, evBnc,
       { id:'radio', ev:true, label:'Radio', tol:'frases correctas',
         tip:'Radio: indicativo, pista, intención. Repite siempre la autorización.' } ],
     done:(st,L)=>(L.d.td && st.time-L.d.t0>3) || L.te>=720 };
@@ -3406,7 +3406,7 @@ function approachLesson(o){
   const vor = { id:'vor', title:'Interceptar y seguir un radial VOR', scene:{ altFt:2500, ias:100, psi:330, x:-2800, z:1800 }, wind:[0,0], grace:0,
     mapVor:true,
     brief:'VOR <b>AST 113.30</b> al norte del aeródromo. Selecciona el curso <b>360°</b> (inbound radial 180), <b>intercepta</b> y síguelo con la aguja dentro de 1 punto.',
-    steps:['Mueve el OBS a 360° (botones OBS)','Aguja a la derecha: el curso está a tu derecha → vira a la derecha','Intercepta a 30° y corrige con ángulos pequeños'],
+    steps:['Mueve el OBS a 360° (botones OBS)','Empiezas al este del radial: la aguja está a la izquierda. Mantén 330° (intercepción a 30°) hasta que se centre y entonces vira a 360°','Intercepta a 30° y corrige con ángulos pequeños'],
     start:(L)=>{ L.d = { int:false, tInt:0 }; },
     tick:(st,L)=>{
       const n = navState(st);
