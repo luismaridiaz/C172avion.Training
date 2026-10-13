@@ -41,8 +41,8 @@ body{
   border:1px solid #23334d; box-shadow:0 8px 28px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
   backdrop-filter:blur(6px); z-index:5;
 }
-.gauge{position:relative; text-align:center; width:74px}
-.gauge canvas{width:74px; height:74px; display:block; border-radius:50%}
+.gauge{position:relative; text-align:center; width:77.5px}
+.gauge canvas{width:77.5px; height:77.5px; display:block; border-radius:50%}
 .gauge span{
   display:block; margin-top:1px; font:700 8px/1 var(--mono);
   letter-spacing:.6px; color:#7f90ad;
@@ -113,7 +113,7 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   will-change:transform;
 }
-#yokeVisual svg{overflow:visible; width:150px; height:78px; filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+#yokeVisual svg{overflow:visible; width:165px; height:85.8px; filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
 
 /* Pedales */
 .pedalArea{
@@ -252,9 +252,9 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
 }
 #ctrlFlight{flex:1 1 auto; min-width:0}
 #ctrlEngine{flex:0 0 auto}
-#ctrlOverlay .yokeArea{height:74px}
+#ctrlOverlay .yokeArea{height:81.4px}
 #ctrlOverlay .yokeArea::after{display:none}
-#ctrlOverlay #yokeVisual svg{width:112px; height:58px}
+#ctrlOverlay #yokeVisual svg{width:123.2px; height:63.8px}
 #ctrlOverlay .pedalArea{height:42px}
 #ctrlOverlay .pedalArea::after{display:none}
 #ctrlOverlay .pedal{width:28px; height:26px; bottom:7px}
@@ -268,23 +268,23 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
 #ctrlOverlay .leverWrap label{font-size:7px}
 
 @media(max-width:860px){
-  .gauge{width:58px}
-  .gauge canvas{width:58px;height:58px}
+  .gauge{width:60.7px}
+  .gauge canvas{width:60.7px;height:60.7px}
   #gaugePanel{gap:4px; padding:5px 6px; bottom:5px}
   #mapBox{width:170px; height:120px}
   #mapToggle{top:134px}
   .col{flex:1 1 100%; min-width:0}
   #panel{max-height:42vh}
-  .yokeArea{height:92px}
+  .yokeArea{height:101.2px}
 }
 @media(max-width:520px){
   .gauge{width:48px}
   .gauge canvas{width:48px;height:48px}
   .gauge span{font-size:7px}
-  .gauge{width:44px}
-  .gauge canvas{width:44px;height:44px}
+  .gauge{width:46.1px}
+  .gauge canvas{width:46.1px;height:46.1px}
   #gaugePanel{grid-template-columns:repeat(7,auto); gap:3px; padding:4px 5px}
-  #ctrlOverlay .yokeArea{height:66px}
+  #ctrlOverlay .yokeArea{height:72.6px}
   #ctrlOverlay .lever{height:100px}
   #lessonBox{max-height:calc(100% - 100px)}
 }
