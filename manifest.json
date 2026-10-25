@@ -1,6 +1,6 @@
 {
-  "name": "Entrenador C172 — Escuela de vuelo",
-  "short_name": "C172",
+  "name": "Entrenador C172 v3 — Escuela de vuelo",
+  "short_name": "C172 v3",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

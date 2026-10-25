@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Entrenador C172 — Escuela de vuelo</title>
+<title>Entrenador C172 v3 — Escuela de vuelo</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#080c14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -289,6 +289,37 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
   #lessonBox{max-height:calc(100% - 100px)}
 }
 
+/* ---------- MANDO CIRCULAR (botón en aro) ---------- */
+#stickRing{
+  display:none; position:absolute; left:50%; top:50%; width:var(--ring,88px); height:var(--ring,88px);
+  margin:calc(var(--ring,88px) / -2) 0 0 calc(var(--ring,88px) / -2); border-radius:50%;
+  border:2px solid #2f4b70; pointer-events:none;
+  background:radial-gradient(circle at 50% 40%, #182841, #0a1220);
+  box-shadow:inset 0 0 16px rgba(79,195,247,.18), 0 0 0 4px rgba(47,75,112,.25);
+}
+#stickRing::before,#stickRing::after{content:''; position:absolute; background:rgba(79,195,247,.16)}
+#stickRing::before{left:50%; top:8%; bottom:8%; width:1px}
+#stickRing::after{top:50%; left:8%; right:8%; height:1px}
+#stickKnob{
+  position:absolute; left:50%; top:50%; width:38px; height:38px; margin:-19px 0 0 -19px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #8fdcff, #2a8fc0 70%); border:1.5px solid #c4ecff;
+  box-shadow:0 3px 9px rgba(0,0,0,.65);
+}
+.yokeArea.stick #stickRing{display:block}
+#ellipsePad{display:none; position:absolute; left:4%; right:4%; top:6%; bottom:6%; border-radius:50%;
+  border:2px solid #2f4b70; background:radial-gradient(ellipse at 50% 40%, #182841, #0a1220);
+  box-shadow:inset 0 0 16px rgba(79,195,247,.18); pointer-events:none}
+#ellipsePad::before{content:''; position:absolute; left:50%; top:10%; bottom:10%; width:1px; background:rgba(79,195,247,.14)}
+#ellipsePad::after{content:''; position:absolute; top:50%; left:6%; right:6%; height:1px; background:rgba(79,195,247,.14)}
+#ellipseYoke{position:absolute; left:50%; top:50%; width:28%; max-width:120px; aspect-ratio:150/78; margin-left:-14%; transform:translate(0,-50%); will-change:transform; opacity:.95}
+#ellipseYoke svg{width:100%; height:100%; overflow:visible; filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+.yokeArea.ell #ellipsePad{display:block}
+.yokeArea.ell #stickRing,.yokeArea.ell #yokeVisual{display:none}
+.yokeArea.ell::after{display:none}
+.yokeArea.stick #yokeVisual{display:none}
+#ctrlOverlay .yokeArea.stick{height:104px}
+@media(max-width:520px){ #ctrlOverlay .yokeArea.stick{height:98px} #stickRing{--ring:84px} #stickKnob{width:36px;height:36px;margin:-18px 0 0 -18px} }
+
 /* ---------- NUEVOS MÓDULOS ---------- */
 #coach{
   position:absolute; left:50%; bottom:92px; transform:translateX(-50%); z-index:12; max-width:min(420px,92%);
@@ -416,6 +447,13 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
     <div id="ctrlOverlay">
       <div class="ctrlBlock" id="ctrlFlight">
         <div class="yokeArea" id="yokeArea">
+          <div id="ellipsePad"><div id="ellipseYoke"><svg viewBox="0 0 150 78">
+              <rect x="65" y="38" width="20" height="30" rx="4" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
+              <rect x="16" y="30" width="118" height="8" rx="4" fill="#243244" stroke="#4fc3f7" stroke-width="1.6"/>
+              <rect x="6" y="-1" width="15" height="42" rx="6" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
+              <rect x="129" y="-1" width="15" height="42" rx="6" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
+              <circle cx="75" cy="52" r="8.5" fill="#4fc3f7" opacity=".9"/></svg></div></div>
+          <div id="stickRing"><div id="stickKnob"></div></div>
           <div id="yokeVisual">
             <svg viewBox="0 0 150 78">
               <rect x="65" y="38" width="20" height="30" rx="4" fill="#16202e" stroke="#4fc3f7" stroke-width="1.6"/>
@@ -1221,13 +1259,19 @@ scene.add(camera);
 /* --- morro desde la cabina --- */
 const cockpitNose = new THREE.Group();
 (function buildCockpitNose(){
-  const mat  = new THREE.MeshLambertMaterial({ color:0xdde4ec });
-  const dark = new THREE.MeshLambertMaterial({ color:0x1a2130 });
-  const cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.5,1.7,14), mat);
-  cowl.rotation.x = Math.PI/2; cowl.position.set(0,-0.62,-1.55);
-  cockpitNose.add(cowl);
-  const dash = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,0.5), dark);
-  dash.position.set(0,-0.68,-0.35); cockpitNose.add(dash);
+  const M = (c,e,o)=>{ const m = new THREE.MeshLambertMaterial({ color:c, emissive:c, emissiveIntensity:(e==null?0.4:e) }); if(o!=null){ m.transparent=true; m.opacity=o; m.depthWrite=false; } return m; };
+  const B = (w,h,d,mat,x,y,z,rx,ry,rz)=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,rz||0); cockpitNose.add(m); return m; };
+  const C = (rt,rb,h,mat,x,y,z,rx)=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,16), mat); m.position.set(x,y,z); m.rotation.x = rx||0; cockpitNose.add(m); return m; };
+  /* C172: interior beige, cuadro negro mate, montantes color crema, capó blanco, brújula en el parabrisas */
+  C(0.30,0.24,1.5,M(0xeef1f4,0.5),0,-0.82,-1.7,Math.PI/2);
+  B(2.3,0.13,0.5,M(0x232326,0.3),0,-0.46,-0.72,-0.16,0,0);          // visera del cuadro
+  B(2.6,0.11,0.5,M(0xcdbf9f,0.55),0,0.45,-0.8,0,0,0);              // techo
+  B(0.05,1.5,0.05,M(0xd6cbb0,0.55),-0.92,0.0,-0.8,0,0,-0.20);     // montantes
+  B(0.05,1.5,0.05,M(0xd6cbb0,0.55), 0.92,0.0,-0.8,0,0, 0.20);
+  B(0.035,0.42,0.05,M(0xcfc3a4,0.55),0,0.27,-0.8,0,0,0);          // travesaño central del parabrisas
+  B(0.10,1.3,0.1,M(0xb8a98a,0.45),-1.26,-0.1,-0.7,0,0,0);          // tapizado de las puertas
+  B(0.10,1.3,0.1,M(0xb8a98a,0.45), 1.26,-0.1,-0.7,0,0,0);
+  C(0.028,0.028,0.02,M(0x1c1c1e,0.3),0,0.36,-0.72,Math.PI/2);        // brújula
 })();
 camera.add(cockpitNose);
 
@@ -1881,7 +1925,46 @@ let yokeActive = false;
 const yokeArea = $('yokeArea'), yokeVisual = $('yokeVisual');
 
 let yokeV = false;           // modo solo cabeceo (arrastrando el botón central)
+let stickR = 26;             // recorrido máximo del botón en el aro (px)
+function updateStickGeom(){
+  const ring = $('stickRing'), knob = $('stickKnob'); if(!ring || !knob) return;
+  const rw = ring.offsetWidth, kw = knob.offsetWidth;
+  if(rw > 0) stickR = Math.max(10, rw/2 - kw/2 - 2);
+}
+const ELL = { ex:0, ey:0 };
+function expo(v){ return 0.45*v + 0.55*v*Math.abs(v)*Math.abs(v); }  // suave en el centro, pleno en el borde
+function setEllipse(clientX, clientY){
+  const r = $('ellipsePad').getBoundingClientRect();
+  let nx = (clientX - (r.left + r.width/2)) / (r.width/2);
+  let ny = (clientY - (r.top + r.height/2)) / (r.height/2);
+  const L = Math.hypot(nx, ny); if(L > 1){ nx /= L; ny /= L; }
+  nx = expo(nx); ny = expo(ny);
+  feel.cmd.aileron = nx; feel.cmd.elevator = -ny;
+  drawEllipse(nx, ny);
+}
+function drawEllipse(nx, ny){
+  const r = $('ellipsePad').getBoundingClientRect();
+  $('ellipseYoke').style.transform =
+    `translate(${(nx*r.width*0.26).toFixed(1)}px, calc(-50% + ${(ny*r.height*0.08).toFixed(1)}px)) rotate(${(nx*40).toFixed(1)}deg)`;
+}
+function applyStickStyle(){
+  yokeArea.classList.toggle('ell', !!Settings.d.ellipse);
+  yokeArea.classList.toggle('stick', !!Settings.d.stick && !Settings.d.ellipse);
+  updateStickGeom();
+}
+function setStick(clientX, clientY){
+  const ring = $('stickRing').getBoundingClientRect();
+  const cx = ring.left + ring.width/2, cy = ring.top + ring.height/2;
+  let dx = clientX - cx, dy = clientY - cy;
+  const len = Math.hypot(dx, dy);
+  if(len > stickR){ dx *= stickR/len; dy *= stickR/len; }
+  feel.cmd.aileron  = dx/stickR;
+  feel.cmd.elevator = -dy/stickR;
+  $('stickKnob').style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+}
 function setYoke(clientX, clientY){
+  if(Settings.d.ellipse){ setEllipse(clientX, clientY); return; }
+  if(Settings.d.stick){ setStick(clientX, clientY); return; }
   const r = yokeArea.getBoundingClientRect();
   const dx = clientX - (r.left + r.width/2);
   const dy = clientY - (r.top + r.height/2);
@@ -1898,13 +1981,15 @@ function setYoke(clientX, clientY){
     `translate(${(ail*r.width*0.16).toFixed(1)}px, ${(elev*r.height*0.16).toFixed(1)}px) rotate(${rollShown.toFixed(1)}deg)`;
 }
 yokeArea.addEventListener('pointerdown', e=>{
-  yokeActive = true; yokeV = (e.target && e.target.id === 'yokeKnob');
+  yokeActive = true; yokeV = !Settings.d.ellipse && (e.target && e.target.id === "yokeKnob");
   yokeArea.setPointerCapture(e.pointerId); setYoke(e.clientX, e.clientY);
 });
 yokeArea.addEventListener('pointermove', e=>{ if(yokeActive) setYoke(e.clientX, e.clientY); });
 function releaseYoke(){
   if(!yokeActive) return;
   yokeActive = false; yokeV = false;
+  if(Settings.d.ellipse){ const y=$('ellipseYoke'); y.style.transition='transform .35s cubic-bezier(.2,.8,.3,1)'; y.style.transform=''; setTimeout(()=>{y.style.transition='';},380); }
+  if(Settings.d.stick){ $('stickKnob').style.transition = 'transform .3s cubic-bezier(.2,.8,.3,1)'; setTimeout(()=>{ $('stickKnob').style.transition = ''; }, 320); }
   yokeVisual.style.transition = 'transform .35s cubic-bezier(.2,.8,.3,1)';
   yokeVisual.style.transform = '';
   setTimeout(()=>{ yokeVisual.style.transition = ''; }, 380);
@@ -1979,9 +2064,11 @@ function keysToFeel(dt){
   if(keys['f']||keys['F']) leverFlap.set(leverFlap.get() + 0.5*dt);
   if(keys['v']||keys['V']) leverFlap.set(leverFlap.get() - 0.5*dt);
 
-  if(!keys['ArrowUp'] && !keys['ArrowDown'])   feel.cmd.elevator *= Math.exp(-6*dt);
-  if(!keys['ArrowLeft'] && !keys['ArrowRight'])feel.cmd.aileron  *= Math.exp(-7*dt);
-  if(!keys['a'] && !keys['A'] && !keys['d'] && !keys['D']) feel.cmd.rudder *= Math.exp(-7*dt);
+  if(!yokeActive && !Gyro.on){
+    if(!keys['ArrowUp'] && !keys['ArrowDown'])   feel.cmd.elevator *= Math.exp(-6*dt);
+    if(!keys['ArrowLeft'] && !keys['ArrowRight'])feel.cmd.aileron  *= Math.exp(-7*dt);
+  }
+  if(!pedalActive && !keys['a'] && !keys['A'] && !keys['d'] && !keys['D']) feel.cmd.rudder *= Math.exp(-7*dt);
 }
 
 /* ==========================================================================
@@ -2257,6 +2344,10 @@ function loop(now){
   /* --- entradas --- */
   const pad = applyGamepad();
   if(!pad) keysToFeel(dt);
+  if(Settings.d.ellipse && !yokeActive){ drawEllipse(feel.cmd.aileron, -feel.cmd.elevator); }
+  if(Settings.d.stick && !Settings.d.ellipse && !yokeActive){
+    $('stickKnob').style.transform = `translate(${(feel.cmd.aileron*stickR).toFixed(1)}px, ${(-feel.cmd.elevator*stickR).toFixed(1)}px)`;
+  }
   if(Gyro.on && !yokeActive){ feel.cmd.aileron = Gyro.roll; feel.cmd.elevator = Gyro.pitch; }
 
   /* --- física con paso fijo --- */
@@ -2328,6 +2419,7 @@ function loop(now){
    REDIMENSIONADO
    ========================================================================== */
 function resizeAll(){
+  updateStickGeom();
   const wrap = $('cockpitWrap');
   const w = Math.max(1, wrap.clientWidth);
   const h = Math.max(1, wrap.clientHeight);
@@ -2649,7 +2741,7 @@ function togglePause(){
 const Lsn = {
   idx:-1, cur:null, state:'free', L:null, _ui:0, scores:{},
   init(){
-    try{ this.scores = JSON.parse(localStorage.getItem('c172_scores')||'{}'); }catch(e){ this.scores = {}; }
+    try{ this.scores = JSON.parse(localStorage.getItem('c172v3_scores')||'{}'); }catch(e){ this.scores = {}; }
     this.buildSelect();
     $('lsSel').addEventListener('change', e=> { this.select(+e.target.value); e.target.blur(); });
     $('lsGo').onclick = ()=> this.start();
@@ -2780,7 +2872,7 @@ const Lsn = {
     const score = Math.round(rows.reduce((s,r)=>s+r.pct,0)/rows.length * (crashed?0.5:1));
     const prev = this.scores[c.id] || { best:0, pass:false };
     this.scores[c.id] = { best:Math.max(prev.best, score), pass: prev.pass || pass };
-    try{ localStorage.setItem('c172_scores', JSON.stringify(this.scores)); }catch(e){}
+    try{ localStorage.setItem('c172v3_scores', JSON.stringify(this.scores)); }catch(e){}
     this.buildSelect();
     this.showDebrief(rows, score, pass, crashed, st);
   },
@@ -2810,12 +2902,13 @@ const TOL = { s:1, tdFpm:250 };
 const P0 = { Tmax:P.Tmax, Pmax:P.Pmax, CD0:P.CD0 };
 const Settings = {
   d:{ sens:1, dead:0.035, sound:true, hud:true, turb:0, power:1, drag:1, warn:3.2,
-      tolScale:1, tdFpm:250, invRoll:false, invPitch:false },
-  load(){ try{ Object.assign(this.d, JSON.parse(localStorage.getItem('c172_settings')||'{}')); }catch(e){} },
-  save(){ try{ localStorage.setItem('c172_settings', JSON.stringify(this.d)); }catch(e){} },
+      tolScale:1, tdFpm:250, invRoll:false, invPitch:false, stick:true, ellipse:true },
+  load(){ try{ Object.assign(this.d, JSON.parse(localStorage.getItem('c172v3_settings')||'{}')); }catch(e){} },
+  save(){ try{ localStorage.setItem('c172v3_settings', JSON.stringify(this.d)); }catch(e){} },
   apply(){
     const d = this.d;
     feel.gain = d.sens; feel.dead = d.dead;
+    if(typeof applyStickStyle === 'function') applyStickStyle();
     P.Tmax = P0.Tmax*d.power; P.Pmax = P0.Pmax*d.power; P.CD0 = P0.CD0*d.drag;
     P.warnMargin = d.warn*DEG;
     TOL.s = d.tolScale; TOL.tdFpm = d.tdFpm;
@@ -2847,6 +2940,8 @@ const Settings = {
     h('Mandos');
     slider('Sensibilidad','sens',0.5,1.6,0.05,'×');
     slider('Zona muerta','dead',0,0.12,0.005,'');
+    toggle('Mando elíptico (volante dibujado)','ellipse');
+    toggle('Mando circular (botón en aro)','stick');
     toggle('HUD en cabina','hud'); toggle('Sonido','sound');
     h('Giroscopio del móvil');
     toggle('Invertir alabeo','invRoll'); toggle('Invertir cabeceo','invPitch');
@@ -2860,7 +2955,7 @@ const Settings = {
     slider('Escala de tolerancias','tolScale',0.7,1.6,0.05,'×');
     slider('Velocidad vertical máx. en toma','tdFpm',120,500,10,' fpm');
   },
-  reset(){ try{ localStorage.removeItem('c172_settings'); }catch(e){} location.reload(); },
+  reset(){ try{ localStorage.removeItem('c172v3_settings'); }catch(e){} location.reload(); },
   json(){ return JSON.stringify(this.d, null, 2); }
 };
 
