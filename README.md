@@ -8,3 +8,4 @@ La versión anterior (v1) se mantiene aparte, sin cambios.
 - Morro de cabina más pequeño (tapa menos el exterior).
 - Mando elíptico por defecto: elipse con el volante dibujado; arrastra a los lados = alerones, arriba/abajo = cabeceo (arriba = morro arriba), con curva suave en el centro. Al soltar vuelve a neutro. En Ajustes puedes volver al mando circular o al volante clásico.
 - Vista de cabina propia (colores y marcos de cada modelo).
+- Panel de mandos y escenario ~1/3 más bajo; instrumentos redondos ocupan el ancho del móvil; (Arrow/L-39) tren como palanca vertical.
