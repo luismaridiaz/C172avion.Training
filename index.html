@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="C172">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 <style>
 :root{
@@ -2859,14 +2860,14 @@ function gaugeALT(cv, ft){
   const pos = ((ft % 10000)+10000)%10000;
   // aguja larga (cientos)
   ctx.save();
-  ctx.rotate((pos%1000)/1000*Math.PI*2);
+  ctx.rotate((pos%1000)/1000*Math.PI*2 - Math.PI/2);
   ctx.beginPath();
   ctx.moveTo(r*0.72,0); ctx.lineTo(-r*0.10, r*0.018); ctx.lineTo(-r*0.10,-r*0.018);
   ctx.closePath(); ctx.fillStyle='#f2f6fa'; ctx.fill(); ctx.restore();
 
   // aguja corta (millares)
   ctx.save();
-  ctx.rotate(pos/10000*Math.PI*2);
+  ctx.rotate(pos/10000*Math.PI*2 - Math.PI/2);
   ctx.beginPath();
   ctx.moveTo(r*0.50,0); ctx.lineTo(-r*0.08, r*0.038); ctx.lineTo(-r*0.08,-r*0.038);
   ctx.closePath(); ctx.fillStyle='#dfe9f5'; ctx.fill(); ctx.restore();
