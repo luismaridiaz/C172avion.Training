@@ -450,6 +450,24 @@ button.warn.on{background:rgba(255,92,92,.2); color:var(--bad); border-color:var
   #ctrlOverlay .lever{height:50px}
   #ctrlOverlay .row button{padding:2px 4px}
 }
+
+/* ---------- escritorio / tele: vista 3D grande y panel de mandos lateral ---------- */
+@media (min-width:1000px) and (min-aspect-ratio:4/3){
+  body{flex-direction:row}
+  #stage{flex:1 1 0; min-width:0; min-height:0}
+  #panel{flex:0 0 clamp(390px,28vw,500px); width:clamp(390px,28vw,500px); height:100vh; height:100dvh; max-height:none; overflow:hidden;
+         border-top:0; border-left:3px solid #4fc3f7; box-shadow:-6px 0 24px rgba(0,0,0,.5); padding:8px 10px 10px}
+  #ctrlOverlay{flex-direction:column; gap:6px; margin-bottom:6px}
+  #ctrlFlight,#ctrlEngine{flex:0 0 auto; width:100%}
+  #ctrlOverlay .yokeArea,#ctrlOverlay .yokeArea.stick{height:150px}
+  #ctrlOverlay #yokeVisual svg{width:150px; height:78px}
+  #ctrlOverlay .lever{height:124px}
+  #ctrlOverlay .pedalArea{height:44px}
+  #ctrlOverlay #stickRing{--ring:112px}
+  #ctrlOverlay #stickKnob{width:46px; height:46px; margin:-23px 0 0 -23px}
+  .grid{overflow-y:auto; overflow-x:hidden; flex:1 1 auto; min-height:0}
+  .col{flex:1 1 100%; min-width:0}
+}
 </style>
 </head>
 <body>
@@ -3506,22 +3524,89 @@ function keysToFeel(dt){
 /* ==========================================================================
    MANDO (GAMEPAD)
    ========================================================================== */
-function applyGamepad(){
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  let gp = null;
-  for(let i=0;i<pads.length;i++){
-    if(pads[i] && pads[i].axes && pads[i].axes.length >= 2){ gp = pads[i]; break; }
+/* ==========================================================================
+   JOYSTICK / MANDO (Gamepad API) — asignación de ejes y botones configurable
+   ========================================================================== */
+const JOY = (function(){
+  const KEY='joy_cfg_v1';
+  const AX=[['aileron','Alabeo (izq/der)'],['elevator','Cabeceo (profundidad)'],['rudder','Timón (pedales/torsión)'],['throttle','Gases (palanca)']];
+  const BT=[['brake','Frenos (mantener)'],['gear','Tren (alternar)'],['flapUp','Flaps +'],['flapDn','Flaps −'],['trimUp','Trim ▲'],['trimDn','Trim ▼']];
+  // perfil por defecto: X, Y, torsión, palanca (T.16000M + TWCS y similares); ajustable en pantalla
+  const DEF={ax:{aileron:{i:0,inv:0},elevator:{i:1,inv:0},rudder:{i:2,inv:0},throttle:{i:3,inv:0}},bt:{brake:0,gear:1,flapUp:3,flapDn:2,trimUp:-1,trimDn:-1},dz:0.05};
+  let cfg; try{ cfg=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ cfg=null; }
+  if(!cfg||!cfg.ax) cfg=JSON.parse(JSON.stringify(DEF));
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(cfg)); }catch(e){} }
+  const st={act:0, thr:null, was:{}, bprev:{}, held:{}};
+  function pad(){ const p=navigator.getGamepads?navigator.getGamepads():[]; for(let i=0;i<p.length;i++) if(p[i]&&p[i].axes&&p[i].axes.length>=2) return p[i]; return null; }
+  function dz(v,d){ const a=Math.abs(v); return a<d?0:Math.sign(v)*(a-d)/(1-d); }
+  function val(gp,k){ const m=cfg.ax[k]; if(!m||m.i<0||m.i>=gp.axes.length) return null; let v=gp.axes[m.i]; return m.inv?-v:v; }
+  function setThr(v){ try{ if(typeof thrAll==='function') thrAll(v); else if(typeof leverThrottle!=='undefined'&&leverThrottle) leverThrottle.set(v); else feel.cmd.throttle=v; }catch(e){} }
+  function flap(d){ try{ const v=Math.round(leverFlap.get()*3)/3+d/3; leverFlap.set(Math.max(0,Math.min(1,v))); }catch(e){} }
+  function edge(gp,k,fn){ const b=cfg.bt[k]; if(b<0||!gp.buttons[b]) return; const p=gp.buttons[b].pressed; if(p&&!st.bprev[k]) fn(); st.bprev[k]=p; }
+  function apply(dt){
+    const gp=pad(); if(!gp) return false;
+    const now=performance.now(), d=cfg.dz||0.05; let moved=false;
+    const upd=(k,fn)=>{ const raw=val(gp,k); if(raw===null) return; const v=dz(raw,d); if(v!==0){ fn(v); st.was[k]=1; moved=true; } else if(st.was[k]){ fn(0); st.was[k]=0; } };
+    upd('aileron',v=>feel.cmd.aileron=v);
+    upd('elevator',v=>feel.cmd.elevator=-v);
+    upd('rudder',v=>feel.cmd.rudder=v);
+    const t=val(gp,'throttle');
+    if(t!==null){ const v=Math.max(0,Math.min(1,(t+1)/2)); if(st.thr===null) st.thr=v; else if(Math.abs(v-st.thr)>0.015){ st.thr=v; setThr(v); moved=true; } }
+    const b=cfg.bt.brake; if(b>=0&&gp.buttons[b]&&gp.buttons[b].value>0.3){ ac.controls.brake=Math.max(ac.controls.brake,gp.buttons[b].value); moved=true; }
+    edge(gp,'gear',()=>{ if(typeof toggleGear==='function') toggleGear(); });
+    edge(gp,'flapUp',()=>flap(1)); edge(gp,'flapDn',()=>flap(-1));
+    if(typeof feel!=='undefined'&&feel.trim){
+      if(cfg.bt.trimUp>=0&&gp.buttons[cfg.bt.trimUp]&&gp.buttons[cfg.bt.trimUp].pressed) feel.trim.elevator=Math.min(0.5,feel.trim.elevator+0.35*(dt||0.016));
+      if(cfg.bt.trimDn>=0&&gp.buttons[cfg.bt.trimDn]&&gp.buttons[cfg.bt.trimDn].pressed) feel.trim.elevator=Math.max(-0.5,feel.trim.elevator-0.35*(dt||0.016));
+    }
+    if(moved) st.act=now;
+    return (now-st.act)<1500;     // mientras se usa, el teclado no pisa el joystick
   }
-  if(!gp) return false;
-  const ax = gp.axes, bt = gp.buttons || [];
-  if(Math.abs(ax[0])>0.02) feel.cmd.aileron  = ax[0];
-  if(Math.abs(ax[1])>0.02) feel.cmd.elevator = -ax[1];
-  if(ax.length > 3) feel.cmd.throttle = clamp((ax[3]+1)/2, 0, 1);
-  if(ax.length > 2 && Math.abs(ax[2])>0.02) feel.cmd.rudder = ax[2];
-  if(bt[6]) ac.controls.brake = Math.max(ac.controls.brake, bt[6].value||0);
-  if(bt[7]) ac.controls.brake = Math.max(ac.controls.brake, bt[7].value||0);
-  return true;
-}
+  /* ---------- pantalla de asignación ---------- */
+  let box=null, tmr=null, learn=null;
+  function css(){ if(document.getElementById('joyCss')) return; const s=document.createElement('style'); s.id='joyCss'; s.textContent=
+   '#joyBox{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;font:13px system-ui,sans-serif}'+
+   '#joyBox .c{background:#0c1522;color:#dbe8f5;border:1px solid #35506e;border-radius:12px;width:min(560px,94vw);max-height:92vh;overflow:auto;padding:14px}'+
+   '#joyBox h3{margin:0 0 4px;font-size:16px}#joyBox .s{opacity:.7;margin-bottom:10px;line-height:1.35}'+
+   '#joyBox .r{display:grid;grid-template-columns:1fr 82px 44px 1fr 66px;gap:6px;align-items:center;margin:5px 0}'+
+   '#joyBox .rb{display:grid;grid-template-columns:1fr 82px 66px;gap:6px;align-items:center;margin:5px 0}'+
+   '#joyBox select,#joyBox button{background:#15243a;color:#dbe8f5;border:1px solid #35506e;border-radius:6px;padding:6px;font:inherit}'+
+   '#joyBox .bar{height:10px;background:#15243a;border-radius:5px;position:relative;overflow:hidden}#joyBox .bar i{position:absolute;top:0;bottom:0;width:4px;background:#4fc3f7;left:50%}'+
+   '#joyBox .h{margin:12px 0 2px;opacity:.6;font-size:11px;letter-spacing:.1em}#joyBox .f{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}'; document.head.appendChild(s); }
+  function axOpts(n,sel){ let o='<option value="-1">— ninguno —</option>'; for(let i=0;i<n;i++) o+='<option value="'+i+'"'+(i===sel?' selected':'')+'>Eje '+i+'</option>'; return o; }
+  function btOpts(n,sel){ let o='<option value="-1">— ninguno —</option>'; for(let i=0;i<n;i++) o+='<option value="'+i+'"'+(i===sel?' selected':'')+'>Botón '+i+'</option>'; return o; }
+  function render(){
+    const gp=pad(); const na=gp?gp.axes.length:8, nb=gp?gp.buttons.length:16;
+    let h='<div class="c"><h3>Joystick / mando</h3><div class="s">'+(gp?('Detectado: <b>'+gp.id.replace(/</g,'')+'</b> · '+na+' ejes · '+nb+' botones'):'No se detecta ningún mando. Conéctalo y mueve un eje o pulsa un botón (el navegador no lo ve hasta entonces).')+'<br>Pulsa «Detectar» y mueve el eje o pulsa el botón que quieras asignar.</div>';
+    h+='<div class="h">EJES</div>';
+    AX.forEach(([k,n])=>{ const m=cfg.ax[k]; h+='<div class="r"><span>'+n+'</span><select data-ax="'+k+'">'+axOpts(na,m.i)+'</select><label><input type="checkbox" data-inv="'+k+'"'+(m.inv?' checked':'')+'> inv</label><div class="bar"><i id="jb_'+k+'"></i></div><button data-det="ax:'+k+'">Detectar</button></div>'; });
+    h+='<div class="h">BOTONES</div>';
+    BT.forEach(([k,n])=>{ h+='<div class="rb"><span>'+n+'</span><select data-bt="'+k+'">'+btOpts(nb,cfg.bt[k])+'</select><button data-det="bt:'+k+'">Detectar</button></div>'; });
+    h+='<div class="f"><button id="joyRst">Valores por defecto</button><button id="joyOk">Cerrar</button></div></div>';
+    box.innerHTML=h;
+    box.querySelectorAll('[data-ax]').forEach(e=>e.onchange=()=>{ cfg.ax[e.dataset.ax].i=+e.value; st.thr=null; save(); });
+    box.querySelectorAll('[data-inv]').forEach(e=>e.onchange=()=>{ cfg.ax[e.dataset.inv].inv=e.checked?1:0; save(); });
+    box.querySelectorAll('[data-bt]').forEach(e=>e.onchange=()=>{ cfg.bt[e.dataset.bt]=+e.value; save(); });
+    box.querySelectorAll('[data-det]').forEach(e=>e.onclick=()=>{ const g=pad(); if(!g){ return; } const [t,k]=e.dataset.det.split(':'); learn={t,k,a0:g.axes.slice(),btn:e}; e.textContent='…mueve/pulsa'; });
+    box.querySelector('#joyOk').onclick=close;
+    box.querySelector('#joyRst').onclick=()=>{ cfg=JSON.parse(JSON.stringify(DEF)); st.thr=null; save(); render(); };
+  }
+  function tick(){
+    const gp=pad(); if(!gp||!box) return;
+    AX.forEach(([k])=>{ const v=val(gp,k); const el=document.getElementById('jb_'+k); if(el&&v!==null) el.style.left=(50+Math.max(-1,Math.min(1,v))*48)+'%'; });
+    if(learn){
+      if(learn.t==='ax'){ let best=-1,bd=0.5; gp.axes.forEach((v,i)=>{ const d=Math.abs(v-learn.a0[i]); if(d>bd){bd=d;best=i;} }); if(best>=0){ cfg.ax[learn.k].i=best; st.thr=null; save(); learn=null; render(); } }
+      else { const i=gp.buttons.findIndex(b=>b.pressed); if(i>=0){ cfg.bt[learn.k]=i; save(); learn=null; render(); } }
+    }
+  }
+  function open(){ css(); if(box) return; box=document.createElement('div'); box.id='joyBox'; document.body.appendChild(box); box.addEventListener('pointerdown',e=>{ if(e.target===box) close(); }); render(); tmr=setInterval(tick,50); }
+  function close(){ clearInterval(tmr); if(box){ box.remove(); box=null; } learn=null; }
+  function init(){ const b=document.getElementById('btnSet'); if(!b||document.getElementById('btnJoy')) return; const n=document.createElement('button'); n.id='btnJoy'; n.textContent='Joystick'; n.onclick=open; b.parentNode.insertBefore(n,b.nextSibling);
+    window.addEventListener('gamepadconnected',()=>{ if(box) render(); }); }
+  return {apply,open,close,init};
+})();
+function applyGamepad(){ return JOY.apply(); }
+JOY.init();
 
 /* ==========================================================================
    ACTUACIÓN DE SUPERFICIES
@@ -3996,6 +4081,11 @@ function sizeGauges(){
   document.documentElement.style.setProperty('--gs', g + 'px');
   gp.style.gap = gap + 'px'; gp.style.padding = pad + 'px';
 }
+/* Campo de visión: 62° vertical como máximo, pero nunca más de 82° horizontales (evita la deformación en monitores y tele) */
+function fitFov(a){
+  const v = 62, hMax = 82, h = 2*Math.atan(Math.tan(v*Math.PI/360)*a)*180/Math.PI;
+  return h > hMax ? 2*Math.atan(Math.tan(hMax*Math.PI/360)/a)*180/Math.PI : v;
+}
 function resizeAll(){
   sizeGauges();
   updateStickGeom();
@@ -4008,7 +4098,9 @@ function resizeAll(){
   renderer.setSize(w, h, false);
 
   camera.aspect = w/h;
+  camera.fov = fitFov(w/h);
   camera.updateProjectionMatrix();
+  cockpitNose.scale.setScalar(Math.tan(camera.fov*Math.PI/360)/Math.tan(31*Math.PI/180));   // la cabina conserva su encuadre
 
   $('mapToggle').style.top = ($('mapBox').offsetHeight + 12) + 'px';
   $('btnViewFloat').style.top = $('mapToggle').style.top;

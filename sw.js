@@ -1,4 +1,4 @@
-const VERSION = 'c172-v4-21';
+const VERSION = 'c172-v6-1';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'];
 self.addEventListener('install', e=>{
